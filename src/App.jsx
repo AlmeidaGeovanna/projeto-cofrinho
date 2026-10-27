@@ -1,5 +1,4 @@
-import { useState, useEffect } from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 
 import Layout from "./componentes/Layout";
 
@@ -17,55 +16,41 @@ import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
 import { getUsuarioLogado } from "./utils/Autenticacao";
+import useDadosUsuario from "./utils/useDadosUsuario";
 
 import "./App.css";
 
 export default function App() {
+  // Re-renderiza a cada navegação para detectar login/logout
+  useLocation();
+
   const usuario = getUsuarioLogado();
-  const chaveTransacoes = usuario ? `transacoes_${usuario.email}` : "transacoes";
-  const chavePlanejamentos = usuario ? `planejamentos_${usuario.email}` : "planejamentos";
+  const email = usuario?.email;
 
-  const [transacoes, setTransacoes] = useState(() => {
-    const salvo = localStorage.getItem(chaveTransacoes);
-    return salvo ? JSON.parse(salvo) : [];
-  });
+  const [transacoes, setTransacoes] = useDadosUsuario(
+    email ? `transacoes_${email}` : null
+  );
 
-  const [planejamentos, setPlanejamentos] = useState(() => {
-    const salvo = localStorage.getItem(chavePlanejamentos);
-    return salvo ? JSON.parse(salvo) : [];
-  });
-
-  useEffect(() => {
-    localStorage.setItem(chaveTransacoes, JSON.stringify(transacoes));
-  }, [transacoes, chaveTransacoes]);
-
-  useEffect(() => {
-    localStorage.setItem(chavePlanejamentos, JSON.stringify(planejamentos));
-  }, [planejamentos, chavePlanejamentos]);
+  const [planejamentos, setPlanejamentos] = useDadosUsuario(
+    email ? `planejamentos_${email}` : null
+  );
 
   return (
     <Layout>
       <Routes>
-
         {/* Rotas públicas */}
-
-        <Route
-          path="/login"
-          element={<Login />}
-        />
-
-        <Route
-          path="/cadastro"
-          element={<Cadastro />}
-        />
+        <Route path="/login" element={<Login />} />
+        <Route path="/cadastro" element={<Cadastro />} />
 
         {/* Rotas protegidas */}
-
         <Route
           path="/"
           element={
             <RotaProtegida>
-              <Inicio transacoes={transacoes} />
+              <Inicio
+                transacoes={transacoes}
+                planejamentos={planejamentos}
+              />
             </RotaProtegida>
           }
         />
@@ -86,9 +71,7 @@ export default function App() {
           path="/historico"
           element={
             <RotaProtegida>
-              <Historico
-                transacoes={transacoes}
-              />
+              <Historico transacoes={transacoes} />
             </RotaProtegida>
           }
         />
@@ -100,19 +83,20 @@ export default function App() {
               <Planejamento
                 planejamentos={planejamentos}
                 setPlanejamentos={setPlanejamentos}
-                transacoes={transacoes}
                 setTransacoes={setTransacoes}
               />
             </RotaProtegida>
           }
         />
 
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
 
       <ToastContainer
-        position="top-right"
+        position="top-center"
         autoClose={2000}
         theme="dark"
+        newestOnTop
       />
     </Layout>
   );

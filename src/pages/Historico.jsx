@@ -1,304 +1,156 @@
 import { useState } from "react";
-import { FaCalendarAlt } from "react-icons/fa";
+import { FaSearch } from "react-icons/fa";
 
-export default function Historico({
-  transacoes,
-}) {
-  function formatarData(data) {
-    const ano = data.getFullYear();
+import CampoData from "../componentes/CampoData";
+import CardTransacao from "../componentes/CardTransacao";
+import {
+  dataLocalISO,
+  formatarMoeda,
+  ordenarPorDataDesc,
+  somarPorTipo,
+} from "../utils/formatacao";
 
-    const mes = String(
-      data.getMonth() + 1
-    ).padStart(2, "0");
+const filtrosTipo = [
+  { valor: "todas", label: "Todas" },
+  { valor: "entrada", label: "Entradas" },
+  { valor: "saida", label: "Saídas" },
+];
 
-    const dia = String(
-      data.getDate()
-    ).padStart(2, "0");
-
-    return `${ano}-${mes}-${dia}`;
-  }
-
+export default function Historico({ transacoes }) {
   const hoje = new Date();
 
-  const [dataInicio, setDataInicio] =
-    useState(
-      formatarData(
-        new Date(
-          hoje.getFullYear(),
-          hoje.getMonth(),
-          1
-        )
-      )
-    );
+  const [dataInicio, setDataInicio] = useState(
+    dataLocalISO(new Date(hoje.getFullYear(), hoje.getMonth(), 1))
+  );
+  const [dataFim, setDataFim] = useState(dataLocalISO(hoje));
+  const [busca, setBusca] = useState("");
+  const [filtroTipo, setFiltroTipo] = useState("todas");
 
-  const [dataFim, setDataFim] =
-    useState(formatarData(hoje));
+  const periodoInvalido = dataInicio && dataFim && dataInicio > dataFim;
+  const termo = busca.trim().toLowerCase();
 
-  const [busca, setBusca] =
-    useState("");
-
-  const [filtroTipo, setFiltroTipo] =
-    useState("todas");
-
-  const filtradas = transacoes
-    .filter((t) => {
+  const filtradas = ordenarPorDataDesc(
+    transacoes.filter((t) => {
       if (!t.data) return false;
 
       const matchPeriodo =
-        (!dataInicio ||
-          t.data >= dataInicio) &&
+        (!dataInicio || t.data >= dataInicio) &&
         (!dataFim || t.data <= dataFim);
 
       const matchBusca =
-        t.descricao
-          .toLowerCase()
-          .includes(
-            busca.toLowerCase()
-          );
+        !termo ||
+        t.descricao.toLowerCase().includes(termo) ||
+        (t.categoria || "").toLowerCase().includes(termo);
 
-      const matchTipo =
-        filtroTipo === "todas"
-          ? true
-          : t.tipo === filtroTipo;
+      const matchTipo = filtroTipo === "todas" || t.tipo === filtroTipo;
 
-      return (
-        matchPeriodo &&
-        matchBusca &&
-        matchTipo
-      );
+      return matchPeriodo && matchBusca && matchTipo;
     })
-    .sort(
-      (a, b) =>
-        new Date(b.data) -
-        new Date(a.data)
-    );
+  );
 
-  const totalEntradas =
-    filtradas
-      .filter(
-        (t) => t.tipo === "entrada"
-      )
-      .reduce(
-        (acc, item) =>
-          acc + item.valor,
-        0
-      );
-
-  const totalSaidas = filtradas
-    .filter(
-      (t) => t.tipo === "saida"
-    )
-    .reduce(
-      (acc, item) =>
-        acc + item.valor,
-      0
-    );
-
-  const saldo =
-    totalEntradas - totalSaidas;
+  const totalEntradas = somarPorTipo(filtradas, "entrada");
+  const totalSaidas = somarPorTipo(filtradas, "saida");
+  const saldo = totalEntradas - totalSaidas;
 
   return (
-    <div className="container">
-      <h2>Histórico</h2>
+    <section className="pagina">
+      <h1 className="titulo-pagina">Histórico</h1>
 
       <div className="filtros-historico">
-        <input
-          type="text"
-          placeholder="Pesquisar transação..."
-          className="input"
-          value={busca}
-          onChange={(e) =>
-            setBusca(e.target.value)
-          }
-        />
+        <div className="campo-busca">
+          <FaSearch className="busca-icone" aria-hidden="true" />
+          <input
+            type="search"
+            placeholder="Pesquisar por descrição ou categoria..."
+            className="input"
+            aria-label="Pesquisar transação"
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+          />
+        </div>
 
         <div className="filtros-data">
-          <div className="date-wrapper">
-            <input
-              type="date"
-              className="input input-date"
+          <div className="form-group">
+            <label htmlFor="data-inicio">De</label>
+            <CampoData
+              id="data-inicio"
               value={dataInicio}
-              onChange={(e) =>
-                setDataInicio(
-                  e.target.value
-                )
-              }
+              max={dataFim || undefined}
+              onChange={setDataInicio}
             />
-
-            <FaCalendarAlt className="calendar-icon" />
           </div>
 
-          <div className="date-wrapper">
-            <input
-              type="date"
-              className="input input-date"
+          <div className="form-group">
+            <label htmlFor="data-fim">Até</label>
+            <CampoData
+              id="data-fim"
               value={dataFim}
-              onChange={(e) =>
-                setDataFim(
-                  e.target.value
-                )
-              }
+              min={dataInicio || undefined}
+              onChange={setDataFim}
             />
-
-            <FaCalendarAlt className="calendar-icon" />
           </div>
         </div>
 
-        <div className="tipo-filtros">
-          <button
-            type="button"
-            className={
-              filtroTipo === "todas"
-                ? "filtro-btn ativo"
-                : "filtro-btn"
-            }
-            onClick={() =>
-              setFiltroTipo("todas")
-            }
-          >
-            Todas
-          </button>
+        {periodoInvalido && (
+          <p className="texto-perigo">
+            A data inicial é maior que a data final.
+          </p>
+        )}
 
-          <button
-            type="button"
-            className={
-              filtroTipo === "entrada"
-                ? "filtro-btn ativo"
-                : "filtro-btn"
-            }
-            onClick={() =>
-              setFiltroTipo("entrada")
-            }
-          >
-            Entradas
-          </button>
-
-          <button
-            type="button"
-            className={
-              filtroTipo === "saida"
-                ? "filtro-btn ativo"
-                : "filtro-btn"
-            }
-            onClick={() =>
-              setFiltroTipo("saida")
-            }
-          >
-            Saídas
-          </button>
+        <div className="tipo-filtros" role="group" aria-label="Filtrar por tipo">
+          {filtrosTipo.map((f) => (
+            <button
+              key={f.valor}
+              type="button"
+              aria-pressed={filtroTipo === f.valor}
+              className={filtroTipo === f.valor ? "filtro-btn ativo" : "filtro-btn"}
+              onClick={() => setFiltroTipo(f.valor)}
+            >
+              {f.label}
+            </button>
+          ))}
         </div>
       </div>
 
       <div className="resumo-historico">
         <div className="resumo-card entradas">
-          <span className="resumo-label">
-            Entradas
-          </span>
-
-          <h3>
-            {totalEntradas.toLocaleString(
-              "pt-BR",
-              {
-                style: "currency",
-                currency: "BRL",
-              }
-            )}
-          </h3>
+          <span className="resumo-label">Entradas</span>
+          <h3>{formatarMoeda(totalEntradas)}</h3>
         </div>
 
         <div className="resumo-card saidas">
-          <span className="resumo-label">
-            Saídas
-          </span>
-
-          <h3>
-            {totalSaidas.toLocaleString(
-              "pt-BR",
-              {
-                style: "currency",
-                currency: "BRL",
-              }
-            )}
-          </h3>
+          <span className="resumo-label">Saídas</span>
+          <h3>{formatarMoeda(totalSaidas)}</h3>
         </div>
 
         <div className="resumo-card saldo">
-          <span className="resumo-label">
-            Saldo
-          </span>
-
-          <h3>
-            {saldo.toLocaleString(
-              "pt-BR",
-              {
-                style: "currency",
-                currency: "BRL",
-              }
-            )}
+          <span className="resumo-label">Saldo</span>
+          <h3 className={saldo >= 0 ? "positivo" : "negativo"}>
+            {formatarMoeda(saldo)}
           </h3>
         </div>
       </div>
 
       {filtradas.length > 0 ? (
         <>
-          <h3 className="titulo-transacoes">
-            Transações encontradas
-          </h3>
+          <h2 className="titulo-secao">
+            Transações encontradas{" "}
+            <span className="contador">{filtradas.length}</span>
+          </h2>
 
-          {filtradas.map((t) => (
-            <div
-              key={t.id}
-              className={`card ${t.tipo}`}
-            >
-              <div className="card-info">
-                <div className="info-texto">
-                  <strong>
-                    {t.descricao}
-                  </strong>
-
-                  <span className="categoria">
-                    {t.categoria ||
-                      "Outros"}
-                  </span>
-
-                  <span className="data">
-                    {t.data
-                      .split("-")
-                      .reverse()
-                      .join("/")}
-                  </span>
-                </div>
-
-                <span className="valor">
-                  {t.valor.toLocaleString(
-                    "pt-BR",
-                    {
-                      style:
-                        "currency",
-                      currency: "BRL",
-                    }
-                  )}
-                </span>
-              </div>
-            </div>
-          ))}
+          <div className="lista">
+            {filtradas.map((t) => (
+              <CardTransacao key={t.id} item={t} />
+            ))}
+          </div>
         </>
       ) : (
         <div className="estado-vazio">
-          <div className="icone-vazio">
-            💸
-          </div>
-
-          <h3>
-            Nenhuma transação encontrada
-          </h3>
-
-          <p>
-            Tente ajustar o período
-            ou os filtros.
-          </p>
+          <div className="icone-vazio">🔍</div>
+          <h3>Nenhuma transação encontrada</h3>
+          <p>Tente ajustar o período ou os filtros.</p>
         </div>
       )}
-    </div>
+    </section>
   );
 }

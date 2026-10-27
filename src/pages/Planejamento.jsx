@@ -1,22 +1,23 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { toast } from "react-toastify";
-import { FaCalendarAlt } from "react-icons/fa";
+import { FaCheck, FaEdit, FaTrash } from "react-icons/fa";
 
 import ModalConfirmacao from "../componentes/ModalConfirmacao";
 import ModalEditarPlanejamento from "../componentes/ModalEditarPlanejamento";
-
-const categorias = [
-  "Alimentação",
-  "Transporte",
-  "Lazer",
-  "Contas",
-  "Outros",
-];
+import CardTransacao from "../componentes/CardTransacao";
+import CampoData from "../componentes/CampoData";
+import {
+  categoriasSaida,
+  dataLocalISO,
+  formatarMoeda,
+  gerarId,
+  mascaraMoeda,
+  moedaParaNumero,
+} from "../utils/formatacao";
 
 export default function Planejamento({
   planejamentos,
   setPlanejamentos,
-  transacoes,
   setTransacoes,
 }) {
   const [descricao, setDescricao] = useState("");
@@ -24,31 +25,10 @@ export default function Planejamento({
   const [data, setData] = useState("");
   const [categoria, setCategoria] = useState("");
 
-  const [modalAberto, setModalAberto] = useState(false);
-  const [idParaExcluir, setIdParaExcluir] = useState(null);
+  const [paraExcluir, setParaExcluir] = useState(null);
+  const [planejamentoEditando, setPlanejamentoEditando] = useState(null);
 
-  const [modalEditarAberto, setModalEditarAberto] = useState(false);
-  const [planejamentoEditando, setPlanejamentoEditando] =
-    useState(null);
-
-  function handleValor(valorDigitado) {
-    const numeros = valorDigitado.replace(/\D/g, "");
-    const valorNumero = Number(numeros) / 100;
-
-    const formatado = valorNumero.toLocaleString("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    });
-
-    setValor(formatado);
-  }
-
-  useEffect(() => {
-    localStorage.setItem(
-      "planejamentos",
-      JSON.stringify(planejamentos)
-    );
-  }, [planejamentos]);
+  const hoje = dataLocalISO();
 
   function limparFormulario() {
     setDescricao("");
@@ -60,109 +40,95 @@ export default function Planejamento({
   function adicionarPlanejamento(e) {
     e.preventDefault();
 
-    if (!descricao || !valor || !data || !categoria) {
+    const descricaoLimpa = descricao.trim();
+    const valorNumerico = moedaParaNumero(valor);
+
+    if (!descricaoLimpa || !valor || !data || !categoria) {
       toast.error("Preencha todos os campos!");
       return;
     }
-
-    const valorNumerico =
-      Number(valor.replace(/\D/g, "")) / 100;
 
     if (valorNumerico <= 0) {
       toast.error("Informe um valor válido!");
       return;
     }
 
-    const novoPlanejamento = {
-      id: Date.now(),
-      descricao,
-      valor: valorNumerico,
-      data,
-      categoria,
-    };
-
     setPlanejamentos((prev) => [
       ...prev,
-      novoPlanejamento,
+      {
+        id: gerarId(),
+        descricao: descricaoLimpa,
+        valor: valorNumerico,
+        data,
+        categoria,
+      },
     ]);
 
     toast.success("Conta planejada!");
-
     limparFormulario();
   }
 
-  function editarPlanejamento(planejamento) {
-    setPlanejamentoEditando(planejamento);
-    setModalEditarAberto(true);
-  }
-
   function salvarEdicaoPlanejamento(atualizado) {
-    const atualizados = planejamentos.map((p) =>
-      p.id === atualizado.id ? atualizado : p
+    setPlanejamentos((prev) =>
+      prev.map((p) => (p.id === atualizado.id ? atualizado : p))
     );
-
-    setPlanejamentos(atualizados);
-
-    setModalEditarAberto(false);
-
-    toast.info("Planejamento atualizado!");
-  }
-
-  function abrirModal(id) {
-    setIdParaExcluir(id);
-    setModalAberto(true);
+    setPlanejamentoEditando(null);
+    toast.success("Planejamento atualizado!");
   }
 
   function confirmarExclusao() {
-    setPlanejamentos((prev) =>
-      prev.filter((p) => p.id !== idParaExcluir)
-    );
-
-    setModalAberto(false);
-
-    toast.error("Planejamento removido!");
+    setPlanejamentos((prev) => prev.filter((p) => p.id !== paraExcluir.id));
+    setParaExcluir(null);
+    toast.info("Planejamento removido.");
   }
 
   function marcarComoPago(item) {
-    const novaTransacao = {
-      id: Date.now(),
-      descricao: item.descricao,
-      valor: item.valor,
-      tipo: "saida",
-      categoria: item.categoria,
-      data: new Date().toISOString().split("T")[0],
-    };
+    setTransacoes((prev) => [
+      ...prev,
+      {
+        id: gerarId(),
+        descricao: item.descricao,
+        valor: item.valor,
+        tipo: "saida",
+        categoria: item.categoria,
+        data: dataLocalISO(),
+      },
+    ]);
 
-    setTransacoes((prev) => [...prev, novaTransacao]);
+    setPlanejamentos((prev) => prev.filter((p) => p.id !== item.id));
 
-    setPlanejamentos((prev) =>
-      prev.filter((p) => p.id !== item.id)
-    );
-
-    toast.success("Conta paga!");
+    toast.success("Conta paga! Lançada em Transações.");
   }
 
-  const totalPrevisto = planejamentos.reduce(
-    (acc, item) => acc + item.valor,
-    0
+  const totalPrevisto = planejamentos.reduce((acc, item) => acc + item.valor, 0);
+  const totalVencido = planejamentos
+    .filter((p) => p.data < hoje)
+    .reduce((acc, item) => acc + item.valor, 0);
+
+  const planejamentosOrdenados = [...planejamentos].sort((a, b) =>
+    a.data.localeCompare(b.data)
   );
 
-  const planejamentosOrdenados = [...planejamentos].sort(
-    (a, b) => new Date(a.data) - new Date(b.data)
-  );
+  function selo(p) {
+    if (p.data < hoje) return <span className="selo perigo">Vencida</span>;
+    if (p.data === hoje) return <span className="selo alerta">Vence hoje</span>;
+    return null;
+  }
 
   return (
-    <div className="container">
-      <h2>Planejamento</h2>
+    <section className="pagina">
+      <h1 className="titulo-pagina">Planejamento</h1>
 
-      {/* FORMULÁRIO NOVO */}
       <form className="form" onSubmit={adicionarPlanejamento}>
-        <h3 className="form-title">Novo planejamento</h3>
+        <h2 className="form-title">Nova conta a pagar</h2>
 
         <div className="form-group">
-          <label>Descrição</label>
+          <label htmlFor="plan-novo-descricao">Descrição</label>
           <input
+            id="plan-novo-descricao"
             className="input"
+            placeholder="Ex: Conta de luz"
+            maxLength={60}
             value={descricao}
             onChange={(e) => setDescricao(e.target.value)}
           />
@@ -170,128 +136,123 @@ export default function Planejamento({
 
         <div className="form-row">
           <div className="form-group">
-            <label>Valor</label>
+            <label htmlFor="plan-novo-valor">Valor</label>
             <input
+              id="plan-novo-valor"
               className="input"
+              inputMode="numeric"
+              placeholder="R$ 0,00"
               value={valor}
-              onChange={(e) => handleValor(e.target.value)}
+              onChange={(e) => setValor(mascaraMoeda(e.target.value))}
             />
           </div>
 
           <div className="form-group">
-            <label>Data</label>
-            <div className="date-wrapper">
-              <input
-                type="date"
-                className="input input-date"
-                value={data}
-                onChange={(e) => setData(e.target.value)}
-              />
-              <FaCalendarAlt className="calendar-icon" />
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label>Categoria</label>
+            <label htmlFor="plan-novo-categoria">Categoria</label>
             <select
+              id="plan-novo-categoria"
               className="input"
               value={categoria}
               onChange={(e) => setCategoria(e.target.value)}
             >
               <option value="">Selecione</option>
-              {categorias.map((cat) => (
+              {categoriasSaida.map((cat) => (
                 <option key={cat} value={cat}>
                   {cat}
                 </option>
               ))}
             </select>
           </div>
+
+          <div className="form-group">
+            <label htmlFor="plan-novo-data">Vencimento</label>
+            <CampoData id="plan-novo-data" value={data} onChange={setData} />
+          </div>
         </div>
 
-        <button className="button-primary">
+        <button type="submit" className="btn btn-primario">
           Adicionar
         </button>
       </form>
 
-      {/* RESUMO */}
-      <div className="card-resumo">
-        <p>Total previsto</p>
-        <h3>
-          {totalPrevisto.toLocaleString("pt-BR", {
-            style: "currency",
-            currency: "BRL",
-          })}
-        </h3>
+      <div className="resumo-historico">
+        <div className="resumo-card saldo">
+          <span className="resumo-label">Total previsto</span>
+          <h3>{formatarMoeda(totalPrevisto)}</h3>
+        </div>
+
+        {totalVencido > 0 && (
+          <div className="resumo-card saidas">
+            <span className="resumo-label">Vencido</span>
+            <h3 className="negativo">{formatarMoeda(totalVencido)}</h3>
+          </div>
+        )}
       </div>
 
-      {/* LISTA */}
-      {planejamentosOrdenados.map((p) => (
-        <div key={p.id} className="card">
-          <div className="card-info">
-            <div className="info-texto">
-              <strong>{p.descricao}</strong>
-              <span className="categoria">{p.categoria}</span>
-              <span className="data">
-                {p.data.split("-").reverse().join("/")}
-              </span>
-            </div>
-
-            <span className="valor">
-              {p.valor.toLocaleString("pt-BR", {
-                style: "currency",
-                currency: "BRL",
-              })}
-            </span>
-          </div>
-
-          <div className="acoes">
-            <button
-              className="btn-pagar"
-              onClick={() => marcarComoPago(p)}
-            >
-              Pago
-            </button>
-
-            <button
-              className="btn-editar"
-              onClick={() => editarPlanejamento(p)}
-            >
-              Editar
-            </button>
-
-            <button
-              className="btn-excluir"
-              onClick={() => abrirModal(p.id)}
-            >
-              Excluir
-            </button>
-          </div>
+      {planejamentosOrdenados.length === 0 ? (
+        <div className="estado-vazio">
+          <div className="icone-vazio">📅</div>
+          <h3>Nenhuma conta planejada</h3>
+          <p>Cadastre contas futuras para não esquecer de pagar.</p>
         </div>
-      ))}
+      ) : (
+        <div className="lista">
+          {planejamentosOrdenados.map((p) => (
+            <CardTransacao
+              key={p.id}
+              item={p}
+              tipo="saida"
+              selo={selo(p)}
+              acoes={
+                <>
+                  <button
+                    className="btn-icone pagar"
+                    onClick={() => marcarComoPago(p)}
+                    aria-label={`Marcar ${p.descricao} como pago`}
+                    title="Marcar como pago"
+                  >
+                    <FaCheck />
+                  </button>
+                  <button
+                    className="btn-icone editar"
+                    onClick={() => setPlanejamentoEditando(p)}
+                    aria-label={`Editar ${p.descricao}`}
+                    title="Editar"
+                  >
+                    <FaEdit />
+                  </button>
+                  <button
+                    className="btn-icone excluir"
+                    onClick={() => setParaExcluir(p)}
+                    aria-label={`Excluir ${p.descricao}`}
+                    title="Excluir"
+                  >
+                    <FaTrash />
+                  </button>
+                </>
+              }
+            />
+          ))}
+        </div>
+      )}
 
-      {/* MODAL EXCLUSÃO */}
-      {modalAberto && (
+      {paraExcluir && (
         <ModalConfirmacao
           titulo="Excluir planejamento"
-          mensagem={`Deseja excluir "${
-            planejamentos.find((p) => p.id === idParaExcluir)
-              ?.descricao || ""
-          }"?`}
+          mensagem={`Deseja excluir "${paraExcluir.descricao}"?`}
           textoConfirmar="Excluir"
-          textoCancelar="Cancelar"
           onConfirmar={confirmarExclusao}
-          onCancelar={() => setModalAberto(false)}
+          onCancelar={() => setParaExcluir(null)}
         />
       )}
 
-      {/* MODAL EDIÇÃO */}
-      {modalEditarAberto && planejamentoEditando && (
+      {planejamentoEditando && (
         <ModalEditarPlanejamento
           planejamento={planejamentoEditando}
           onSalvar={salvarEdicaoPlanejamento}
-          onCancelar={() => setModalEditarAberto(false)}
+          onCancelar={() => setPlanejamentoEditando(null)}
         />
       )}
-    </div>
+    </section>
   );
 }

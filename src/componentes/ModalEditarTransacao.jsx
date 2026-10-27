@@ -1,244 +1,137 @@
 import { useState } from "react";
 import { toast } from "react-toastify";
-import { FaCalendarAlt } from "react-icons/fa";
+
+import Modal from "./Modal";
+import CampoData from "./CampoData";
+import SeletorTipo from "./SeletorTipo";
+import {
+  categoriasPorTipo,
+  dataLocalISO,
+  formatarMoeda,
+  mascaraMoeda,
+  moedaParaNumero,
+} from "../utils/formatacao";
 
 export default function ModalEditarTransacao({
-    transacao,
-    onSalvar,
-    onCancelar,
+  transacao,
+  onSalvar,
+  onCancelar,
 }) {
-    const [descricao, setDescricao] =
-        useState(transacao.descricao);
+  const [descricao, setDescricao] = useState(transacao.descricao);
+  const [valor, setValor] = useState(formatarMoeda(transacao.valor));
+  const [tipo, setTipo] = useState(transacao.tipo);
+  const [categoria, setCategoria] = useState(transacao.categoria || "");
+  const [data, setData] = useState(transacao.data);
 
-    const [valor, setValor] = useState(
-        transacao.valor.toLocaleString(
-            "pt-BR",
-            {
-                style: "currency",
-                currency: "BRL",
-            }
-        )
-    );
+  const hoje = dataLocalISO();
+  const categorias = categoriasPorTipo(tipo);
 
-    const [tipo, setTipo] = useState(
-        transacao.tipo
-    );
+  function handleTipoChange(novoTipo) {
+    setTipo(novoTipo);
+    // Mantém a categoria só se ela existir no novo tipo
+    if (!categoriasPorTipo(novoTipo).includes(categoria)) {
+      setCategoria("");
+    }
+  }
 
-    const [categoria, setCategoria] =
-        useState(transacao.categoria);
+  function salvarEdicao(e) {
+    e.preventDefault();
 
-    const [data, setData] = useState(
-        transacao.data
-    );
+    const descricaoLimpa = descricao.trim();
+    const valorNumerico = moedaParaNumero(valor);
 
-    const categoriasEntrada = [
-        "Salário",
-        "Freelance",
-        "Investimentos",
-        "Outros",
-    ];
-
-    const categoriasSaida = [
-        "Alimentação",
-        "Transporte",
-        "Lazer",
-        "Contas",
-        "Outros",
-    ];
-
-    function handleValor(valorDigitado) {
-        const numeros =
-            valorDigitado.replace(/\D/g, "");
-
-        const valorNumero =
-            Number(numeros) / 100;
-
-        const formatado =
-            valorNumero.toLocaleString(
-                "pt-BR",
-                {
-                    style: "currency",
-                    currency: "BRL",
-                }
-            );
-
-        setValor(formatado);
+    if (!descricaoLimpa || !valor || !categoria || !data) {
+      toast.error("Preencha todos os campos!");
+      return;
     }
 
-    function salvarEdicao(e) {
-        e.preventDefault();
-
-        const descricaoLimpa =
-            descricao.trim();
-
-        const valorNumerico =
-            Number(valor.replace(/\D/g, "")) /
-            100;
-
-        if (
-            !descricaoLimpa ||
-            !valor ||
-            !categoria ||
-            !data
-        ) {
-            toast.error(
-                "Preencha todos os campos!"
-            );
-
-            return;
-        }
-
-        if (descricaoLimpa.length < 3) {
-            toast.error(
-                "Descrição muito curta!"
-            );
-
-            return;
-        }
-
-        if (valorNumerico <= 0) {
-            toast.error(
-                "Digite um valor válido!"
-            );
-
-            return;
-        }
-
-        onSalvar({
-            ...transacao,
-            descricao: descricaoLimpa,
-            valor: valorNumerico,
-            tipo,
-            categoria,
-            data,
-        });
+    if (descricaoLimpa.length < 3) {
+      toast.error("Descrição muito curta!");
+      return;
     }
 
-    return (
-        <div className="modal-overlay">
-            <div className="modal">
-                <h2>Editar transação</h2>
+    if (valorNumerico <= 0) {
+      toast.error("Digite um valor válido!");
+      return;
+    }
 
-                <form onSubmit={salvarEdicao}>
-                    <div className="form-group">
-                        <label>Descrição</label>
+    if (data > hoje) {
+      toast.error("A data não pode ser futura!");
+      return;
+    }
 
-                        <input
-                            type="text"
-                            className="input"
-                            value={descricao}
-                            onChange={(e) =>
-                                setDescricao(
-                                    e.target.value
-                                )
-                            }
-                        />
-                    </div>
+    onSalvar({
+      ...transacao,
+      descricao: descricaoLimpa,
+      valor: valorNumerico,
+      tipo,
+      categoria,
+      data,
+    });
+  }
 
-                    <div className="form-group">
-                        <label>Valor</label>
+  return (
+    <Modal titulo="Editar transação" onFechar={onCancelar}>
+      <form className="modal-form" onSubmit={salvarEdicao}>
+        <SeletorTipo value={tipo} onChange={handleTipoChange} />
 
-                        <input
-                            type="text"
-                            className="input"
-                            value={valor}
-                            onChange={(e) =>
-                                handleValor(
-                                    e.target.value
-                                )
-                            }
-                        />
-                    </div>
-
-                    <div className="form-group">
-                        <label>Tipo</label>
-
-                        <select
-                            className="input"
-                            value={tipo}
-                            onChange={(e) =>
-                                setTipo(
-                                    e.target.value
-                                )
-                            }
-                        >
-                            <option value="entrada">
-                                Entrada
-                            </option>
-
-                            <option value="saida">
-                                Saída
-                            </option>
-                        </select>
-                    </div>
-
-                    <div className="form-group">
-                        <label>Categoria</label>
-
-                        <select
-                            className="input"
-                            value={categoria}
-                            onChange={(e) =>
-                                setCategoria(
-                                    e.target.value
-                                )
-                            }
-                        >
-                            {(tipo === "entrada"
-                                ? categoriasEntrada
-                                : categoriasSaida
-                            ).map((cat) => (
-                                <option
-                                    key={cat}
-                                    value={cat}
-                                >
-                                    {cat}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div className="form-group">
-                        <label>Data</label>
-
-                        <div className="date-wrapper">
-                            <input
-                                type="date"
-                                className="input input-date"
-                                value={data}
-                                max={
-                                    new Date()
-                                        .toISOString()
-                                        .split("T")[0]
-                                }
-                                onChange={(e) =>
-                                    setData(e.target.value)
-                                }
-                            />
-
-                            <FaCalendarAlt className="calendar-icon" />
-                        </div>
-
-                    </div>
-
-                    <div className="modal-botoes">
-                        <button
-                            type="button"
-                            className="btn-cancelar"
-                            onClick={onCancelar}
-                        >
-                            Cancelar
-                        </button>
-
-                        <button
-                            type="submit"
-                            className="btn-confirmar"
-                        >
-                            Salvar
-                        </button>
-                    </div>
-                </form>
-            </div>
+        <div className="form-group">
+          <label htmlFor="edit-descricao">Descrição</label>
+          <input
+            id="edit-descricao"
+            type="text"
+            className="input"
+            value={descricao}
+            maxLength={60}
+            onChange={(e) => setDescricao(e.target.value)}
+          />
         </div>
-    );
+
+        <div className="form-group">
+          <label htmlFor="edit-valor">Valor</label>
+          <input
+            id="edit-valor"
+            type="text"
+            inputMode="numeric"
+            className="input"
+            value={valor}
+            onChange={(e) => setValor(mascaraMoeda(e.target.value))}
+          />
+        </div>
+
+        <div className="form-row duas">
+          <div className="form-group">
+            <label htmlFor="edit-categoria">Categoria</label>
+            <select
+              id="edit-categoria"
+              className="input"
+              value={categoria}
+              onChange={(e) => setCategoria(e.target.value)}
+            >
+              <option value="">Selecione</option>
+              {categorias.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="edit-data">Data</label>
+            <CampoData id="edit-data" value={data} max={hoje} onChange={setData} />
+          </div>
+        </div>
+
+        <div className="modal-botoes">
+          <button type="button" className="btn btn-secundario" onClick={onCancelar}>
+            Cancelar
+          </button>
+          <button type="submit" className="btn btn-primario">
+            Salvar
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
 }
