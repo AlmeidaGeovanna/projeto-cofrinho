@@ -1,33 +1,31 @@
+import Modal from "./Modal";
+
 export default function ModalConfirmacao({
   onConfirmar,
   onCancelar,
   titulo = "Confirmar ação",
   mensagem = "Tem certeza que deseja continuar?",
   textoConfirmar = "Confirmar",
-  textoCancelar = "Cancelar"
+  textoCancelar = "Cancelar",
 }) {
   return (
-    <div className="modal-overlay">
-      <div className="modal">
-        <h2>{titulo}</h2>
-        <p>{mensagem}</p>
+    <Modal titulo={titulo} onFechar={onCancelar}>
+      <p className="modal-mensagem">{mensagem}</p>
 
-        <div className="modal-botoes">
-          <button
-            className="btn-cancelar"
-            onClick={onCancelar}
-          >
-            {textoCancelar}
-          </button>
+      <div className="modal-botoes">
+        <button type="button" className="btn btn-secundario" onClick={onCancelar}>
+          {textoCancelar}
+        </button>
 
-          <button
-            className="btn-confirmar"
-            onClick={onConfirmar}
-          >
-            {textoConfirmar}
-          </button>
-        </div>
+        <button
+          type="button"
+          className="btn btn-perigo"
+          onClick={onConfirmar}
+          autoFocus
+        >
+          {textoConfirmar}
+        </button>
       </div>
-    </div>
+    </Modal>
   );
 }

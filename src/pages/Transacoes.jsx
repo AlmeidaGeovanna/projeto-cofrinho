@@ -1,148 +1,74 @@
 import { useState } from "react";
 import { toast } from "react-toastify";
-import { FaCalendarAlt } from "react-icons/fa";
+import { FaEdit, FaTrash } from "react-icons/fa";
 
 import ModalConfirmacao from "../componentes/ModalConfirmacao";
 import ModalEditarTransacao from "../componentes/ModalEditarTransacao";
+import CardTransacao from "../componentes/CardTransacao";
+import CampoData from "../componentes/CampoData";
+import SeletorTipo from "../componentes/SeletorTipo";
+import {
+  categoriasPorTipo,
+  dataLocalISO,
+  gerarId,
+  mascaraMoeda,
+  moedaParaNumero,
+  ordenarPorDataDesc,
+} from "../utils/formatacao";
 
-export default function Transacoes({
-  transacoes,
-  setTransacoes,
-}) {
-  const [descricao, setDescricao] =
-    useState("");
+export default function Transacoes({ transacoes, setTransacoes }) {
+  const hoje = dataLocalISO();
 
-  const [valor, setValor] =
-    useState("");
+  const [descricao, setDescricao] = useState("");
+  const [valor, setValor] = useState("");
+  const [tipo, setTipo] = useState("saida");
+  const [categoria, setCategoria] = useState("");
+  const [data, setData] = useState(hoje);
 
-  const [tipo, setTipo] =
-    useState("entrada");
-
-  const [categoria, setCategoria] =
-    useState("");
-
-  const [data, setData] =
-    useState("");
-
-  const [modalAberto, setModalAberto] =
-    useState(false);
-
-  const [idParaExcluir, setIdParaExcluir] =
-    useState(null);
-
-  const [
-    modalEditarAberto,
-    setModalEditarAberto,
-  ] = useState(false);
-
-  const [
-    transacaoEditando,
-    setTransacaoEditando,
-  ] = useState(null);
-
-  const categoriasEntrada = [
-    "Salário",
-    "Freelance",
-    "Investimentos",
-    "Outros",
-  ];
-
-  const categoriasSaida = [
-    "Alimentação",
-    "Transporte",
-    "Lazer",
-    "Contas",
-    "Outros",
-  ];
+  const [paraExcluir, setParaExcluir] = useState(null);
+  const [transacaoEditando, setTransacaoEditando] = useState(null);
 
   function handleTipoChange(novoTipo) {
     setTipo(novoTipo);
     setCategoria("");
   }
 
-  function handleValor(valorDigitado) {
-    const numeros =
-      valorDigitado.replace(/\D/g, "");
-
-    const valorNumero =
-      Number(numeros) / 100;
-
-    const formatado =
-      valorNumero.toLocaleString(
-        "pt-BR",
-        {
-          style: "currency",
-          currency: "BRL",
-        }
-      );
-
-    setValor(formatado);
-  }
-
   function limparFormulario() {
     setDescricao("");
     setValor("");
-    setTipo("entrada");
     setCategoria("");
-    setData("");
+    setData(dataLocalISO());
   }
 
   function adicionarTransacao(e) {
     e.preventDefault();
 
-    const descricaoLimpa =
-      descricao.trim();
+    const descricaoLimpa = descricao.trim();
+    const valorNumerico = moedaParaNumero(valor);
 
-    const valorNumerico =
-      Number(valor.replace(/\D/g, "")) /
-      100;
-
-    const hoje = new Date();
-
-    hoje.setHours(0, 0, 0, 0);
-
-    const dataSelecionada =
-      new Date(data);
-
-    if (
-      !descricaoLimpa ||
-      !valor ||
-      !categoria ||
-      !data
-    ) {
-      toast.error(
-        "Preencha todos os campos!"
-      );
-
+    if (!descricaoLimpa || !valor || !categoria || !data) {
+      toast.error("Preencha todos os campos!");
       return;
     }
 
     if (descricaoLimpa.length < 3) {
-      toast.error(
-        "Descrição inválida!"
-      );
-
+      toast.error("A descrição precisa ter ao menos 3 letras.");
       return;
     }
 
     if (valorNumerico <= 0) {
-      toast.error(
-        "Digite um valor válido!"
-      );
-
+      toast.error("Digite um valor válido!");
       return;
     }
 
-    if (dataSelecionada > hoje) {
-      toast.error(
-        "A data não pode ser futura!"
-      );
-
+    // Datas AAAA-MM-DD podem ser comparadas como texto, sem problemas de fuso
+    if (data > dataLocalISO()) {
+      toast.error("A data não pode ser futura!");
       return;
     }
 
     const nova = {
-      id: Date.now(),
+      id: gerarId(),
       descricao: descricaoLimpa,
       valor: valorNumerico,
       tipo,
@@ -150,292 +76,152 @@ export default function Transacoes({
       data,
     };
 
-    setTransacoes([
-      ...transacoes,
-      nova,
-    ]);
-
-    toast.success(
-      "Transação adicionada!"
-    );
-
+    setTransacoes((prev) => [...prev, nova]);
+    toast.success("Transação adicionada!");
     limparFormulario();
   }
 
-  function abrirModalEdicao(
-    transacao
-  ) {
-    setTransacaoEditando(transacao);
-
-    setModalEditarAberto(true);
-  }
-
-  function salvarEdicao(
-    transacaoAtualizada
-  ) {
-    const atualizadas =
-      transacoes.map((t) =>
-        t.id ===
-          transacaoAtualizada.id
-          ? transacaoAtualizada
-          : t
-      );
-
-    setTransacoes(atualizadas);
-
-    setModalEditarAberto(false);
-
-    toast.success(
-      "Transação atualizada!"
+  function salvarEdicao(transacaoAtualizada) {
+    setTransacoes((prev) =>
+      prev.map((t) => (t.id === transacaoAtualizada.id ? transacaoAtualizada : t))
     );
-  }
-
-  function abrirModal(id) {
-    setIdParaExcluir(id);
-
-    setModalAberto(true);
+    setTransacaoEditando(null);
+    toast.success("Transação atualizada!");
   }
 
   function confirmarExclusao() {
-    setTransacoes(
-      transacoes.filter(
-        (t) => t.id !== idParaExcluir
-      )
-    );
-
-    setModalAberto(false);
-
-    toast.error(
-      "Transação removida!"
-    );
+    setTransacoes((prev) => prev.filter((t) => t.id !== paraExcluir.id));
+    setParaExcluir(null);
+    toast.info("Transação removida.");
   }
 
-  return (
-    <div className="container">
-      <h2>Transações</h2>
+  const ordenadas = ordenarPorDataDesc(transacoes);
 
-      <form
-        className="form"
-        onSubmit={adicionarTransacao}
-      >
-        <h3 className="form-title">
-          Nova transação
-        </h3>
+  return (
+    <section className="pagina">
+      <h1 className="titulo-pagina">Transações</h1>
+
+      <form className="form" onSubmit={adicionarTransacao}>
+        <h2 className="form-title">Nova transação</h2>
+
+        <SeletorTipo value={tipo} onChange={handleTipoChange} />
 
         <div className="form-group">
-          <label>Descrição</label>
-
+          <label htmlFor="descricao">Descrição</label>
           <input
+            id="descricao"
             type="text"
             className="input"
             placeholder="Ex: Mercado"
+            maxLength={60}
             value={descricao}
-            onChange={(e) =>
-              setDescricao(
-                e.target.value
-              )
-            }
+            onChange={(e) => setDescricao(e.target.value)}
           />
         </div>
 
         <div className="form-row">
           <div className="form-group">
-            <label>Valor</label>
-
+            <label htmlFor="valor">Valor</label>
             <input
+              id="valor"
               type="text"
+              inputMode="numeric"
               className="input"
               placeholder="R$ 0,00"
               value={valor}
-              onChange={(e) =>
-                handleValor(
-                  e.target.value
-                )
-              }
+              onChange={(e) => setValor(mascaraMoeda(e.target.value))}
             />
           </div>
 
           <div className="form-group">
-            <label>Tipo</label>
-
+            <label htmlFor="categoria">Categoria</label>
             <select
-              className="input"
-              value={tipo}
-              onChange={(e) =>
-                handleTipoChange(
-                  e.target.value
-                )
-              }
-            >
-              <option value="entrada">
-                Entrada
-              </option>
-
-              <option value="saida">
-                Saída
-              </option>
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label>Categoria</label>
-
-            <select
+              id="categoria"
               className="input"
               value={categoria}
-              onChange={(e) =>
-                setCategoria(
-                  e.target.value
-                )
-              }
+              onChange={(e) => setCategoria(e.target.value)}
             >
-              <option value="">
-                Selecione
-              </option>
-
-              {(tipo === "entrada"
-                ? categoriasEntrada
-                : categoriasSaida
-              ).map((cat) => (
-                <option
-                  key={cat}
-                  value={cat}
-                >
+              <option value="">Selecione</option>
+              {categoriasPorTipo(tipo).map((cat) => (
+                <option key={cat} value={cat}>
                   {cat}
                 </option>
               ))}
             </select>
           </div>
-        </div>
 
-        <div className="form-group">
-          <label>Data</label>
-
-          <div className="date-wrapper">
-            <input
-              type="date"
-              className="input input-date"
-              value={data}
-              max={
-                new Date()
-                  .toISOString()
-                  .split("T")[0]
-              }
-              onChange={(e) =>
-                setData(
-                  e.target.value
-                )
-              }
-            />
-
-            <FaCalendarAlt className="calendar-icon" />
+          <div className="form-group">
+            <label htmlFor="data">Data</label>
+            <CampoData id="data" value={data} max={hoje} onChange={setData} />
           </div>
         </div>
 
-        <button className="button-primary">
+        <button type="submit" className="btn btn-primario">
           Adicionar
         </button>
       </form>
 
-      {transacoes.length === 0 ? (
-        <div className="empty-state">
-          <h3 className="empty-title">
-            Nenhuma transação cadastrada
-          </h3>
+      <h2 className="titulo-secao">
+        Todas as transações{" "}
+        {transacoes.length > 0 && (
+          <span className="contador">{transacoes.length}</span>
+        )}
+      </h2>
+
+      {ordenadas.length === 0 ? (
+        <div className="estado-vazio">
+          <div className="icone-vazio">💸</div>
+          <h3>Nenhuma transação cadastrada</h3>
+          <p>Use o formulário acima para registrar sua primeira movimentação.</p>
         </div>
       ) : (
-        transacoes.map((t) => (
-          <div
-            key={t.id}
-            className={`card ${t.tipo}`}
-          >
-            <div className="card-info">
-              <div className="info-texto">
-                <strong>
-                  {t.descricao}
-                </strong>
-
-                <span className="categoria">
-                  {t.categoria ||
-                    "Outros"}
-                </span>
-
-                <span className="data">
-                  {t.data
-                    .split("-")
-                    .reverse()
-                    .join("/")}
-                </span>
-              </div>
-
-              <span className="valor">
-                {t.valor.toLocaleString(
-                  "pt-BR",
-                  {
-                    style: "currency",
-                    currency: "BRL",
-                  }
-                )}
-              </span>
-            </div>
-
-            <div className="acoes">
-              <button
-                className="btn-editar"
-                onClick={() =>
-                  abrirModalEdicao(t)
-                }
-              >
-                Editar
-              </button>
-
-              <button
-                className="btn-excluir"
-                onClick={() =>
-                  abrirModal(t.id)
-                }
-              >
-                Excluir
-              </button>
-            </div>
-          </div>
-        ))
+        <div className="lista">
+          {ordenadas.map((t) => (
+            <CardTransacao
+              key={t.id}
+              item={t}
+              acoes={
+                <>
+                  <button
+                    className="btn-icone editar"
+                    onClick={() => setTransacaoEditando(t)}
+                    aria-label={`Editar ${t.descricao}`}
+                    title="Editar"
+                  >
+                    <FaEdit />
+                  </button>
+                  <button
+                    className="btn-icone excluir"
+                    onClick={() => setParaExcluir(t)}
+                    aria-label={`Excluir ${t.descricao}`}
+                    title="Excluir"
+                  >
+                    <FaTrash />
+                  </button>
+                </>
+              }
+            />
+          ))}
+        </div>
       )}
 
-      {modalAberto && (
+      {paraExcluir && (
         <ModalConfirmacao
           titulo="Excluir transação"
-          mensagem={`Deseja excluir "${transacoes.find(
-            (t) =>
-              t.id ===
-              idParaExcluir
-          )?.descricao
-            }"?`}
+          mensagem={`Deseja excluir "${paraExcluir.descricao}"?`}
           textoConfirmar="Excluir"
-          textoCancelar="Cancelar"
-          onConfirmar={
-            confirmarExclusao
-          }
-          onCancelar={() =>
-            setModalAberto(false)
-          }
+          onConfirmar={confirmarExclusao}
+          onCancelar={() => setParaExcluir(null)}
         />
       )}
 
-      {modalEditarAberto &&
-        transacaoEditando && (
-          <ModalEditarTransacao
-            transacao={
-              transacaoEditando
-            }
-            onSalvar={salvarEdicao}
-            onCancelar={() =>
-              setModalEditarAberto(
-                false
-              )
-            }
-          />
-        )}
-    </div>
+      {transacaoEditando && (
+        <ModalEditarTransacao
+          transacao={transacaoEditando}
+          onSalvar={salvarEdicao}
+          onCancelar={() => setTransacaoEditando(null)}
+        />
+      )}
+    </section>
   );
 }

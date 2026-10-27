@@ -1,56 +1,30 @@
 import { useState } from "react";
 import { toast } from "react-toastify";
-import { FaCalendarAlt } from "react-icons/fa";
+
+import Modal from "./Modal";
+import CampoData from "./CampoData";
+import {
+  categoriasSaida,
+  formatarMoeda,
+  mascaraMoeda,
+  moedaParaNumero,
+} from "../utils/formatacao";
 
 export default function ModalEditarPlanejamento({
   planejamento,
   onSalvar,
   onCancelar,
 }) {
-  const [descricao, setDescricao] = useState(
-    planejamento.descricao
-  );
-
-  const [valor, setValor] = useState(
-    Number(planejamento.valor).toLocaleString("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    })
-  );
-
-  const [categoria, setCategoria] = useState(
-    planejamento.categoria
-  );
-
-  const [data, setData] = useState(
-    planejamento.data
-  );
-
-  const categorias = [
-    "Alimentação",
-    "Transporte",
-    "Lazer",
-    "Contas",
-    "Outros",
-  ];
-
-  function handleValor(valorDigitado) {
-    const numeros = valorDigitado.replace(/\D/g, "");
-    const valorNumero = Number(numeros) / 100;
-
-    const formatado = valorNumero.toLocaleString("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    });
-
-    setValor(formatado);
-  }
+  const [descricao, setDescricao] = useState(planejamento.descricao);
+  const [valor, setValor] = useState(formatarMoeda(planejamento.valor));
+  const [categoria, setCategoria] = useState(planejamento.categoria || "");
+  const [data, setData] = useState(planejamento.data);
 
   function salvar(e) {
     e.preventDefault();
 
     const descricaoLimpa = descricao.trim();
-    const valorNumerico = Number(valor.replace(/\D/g, "")) / 100;
+    const valorNumerico = moedaParaNumero(valor);
 
     if (!descricaoLimpa || !valor || !categoria || !data) {
       toast.error("Preencha todos os campos!");
@@ -72,39 +46,41 @@ export default function ModalEditarPlanejamento({
   }
 
   return (
-    <div className="modal-overlay">
-      <div className="modal">
-        <h2>Editar planejamento</h2>
+    <Modal titulo="Editar planejamento" onFechar={onCancelar}>
+      <form className="modal-form" onSubmit={salvar}>
+        <div className="form-group">
+          <label htmlFor="plan-descricao">Descrição</label>
+          <input
+            id="plan-descricao"
+            className="input"
+            value={descricao}
+            maxLength={60}
+            onChange={(e) => setDescricao(e.target.value)}
+          />
+        </div>
 
-        <form onSubmit={salvar}>
-          <div className="form-group">
-            <label>Descrição</label>
-            <input
-              className="input"
-              value={descricao}
-              onChange={(e) => setDescricao(e.target.value)}
-            />
-          </div>
+        <div className="form-group">
+          <label htmlFor="plan-valor">Valor</label>
+          <input
+            id="plan-valor"
+            className="input"
+            inputMode="numeric"
+            value={valor}
+            onChange={(e) => setValor(mascaraMoeda(e.target.value))}
+          />
+        </div>
 
+        <div className="form-row duas">
           <div className="form-group">
-            <label>Valor</label>
-            <input
-              className="input"
-              value={valor}
-              onChange={(e) => handleValor(e.target.value)}
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Categoria</label>
+            <label htmlFor="plan-categoria">Categoria</label>
             <select
+              id="plan-categoria"
               className="input"
               value={categoria}
               onChange={(e) => setCategoria(e.target.value)}
             >
               <option value="">Selecione</option>
-
-              {categorias.map((cat) => (
+              {categoriasSaida.map((cat) => (
                 <option key={cat} value={cat}>
                   {cat}
                 </option>
@@ -113,34 +89,20 @@ export default function ModalEditarPlanejamento({
           </div>
 
           <div className="form-group">
-            <label>Data</label>
-
-            <div className="date-wrapper">
-              <input
-                type="date"
-                className="input input-date"
-                value={data}
-                onChange={(e) => setData(e.target.value)}
-              />
-              <FaCalendarAlt className="calendar-icon" />
-            </div>
+            <label htmlFor="plan-data">Vencimento</label>
+            <CampoData id="plan-data" value={data} onChange={setData} />
           </div>
+        </div>
 
-          <div className="modal-botoes">
-            <button
-              type="button"
-              className="btn-cancelar"
-              onClick={onCancelar}
-            >
-              Cancelar
-            </button>
-
-            <button type="submit" className="btn-confirmar">
-              Salvar
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <div className="modal-botoes">
+          <button type="button" className="btn btn-secundario" onClick={onCancelar}>
+            Cancelar
+          </button>
+          <button type="submit" className="btn btn-primario">
+            Salvar
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 }

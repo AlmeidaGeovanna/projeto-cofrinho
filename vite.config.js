@@ -12,8 +12,8 @@ export default defineConfig({
         name: "Cofrinho",
         short_name: "Cofrinho",
         description: "Controle financeiro pessoal",
-        theme_color: "#121214",
-        background_color: "#121214",
+        theme_color: "#0b1120",
+        background_color: "#0b1120",
         display: "standalone",
         start_url: "/",
         icons: [
